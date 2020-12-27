@@ -1,0 +1,17 @@
+{
+  "name": "youtubetomp3",
+  "version": "1.0.0",
+  "description": "Convert a Youtube Video from a Youtube URL to a playable MP3 with an image and meta data",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Marvin Lee",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "prompt": "^1.1.0",
+    "ytdl-core": "^4.2.1"
+  }
+}
