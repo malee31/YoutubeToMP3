@@ -4,18 +4,22 @@ const https = require("https");
 require("dotenv").config();
 
 async function downloadThumbnail(YoutubeVideoInfo) {
-	return new Promise(async(resolve, reject) => {
-		let imageURL;
+	let imageURL;
 
-		if(!imageURL) {
-			const thumbnails = YoutubeVideoInfo.videoDetails.thumbnails;
-			let selectedThumbnail = thumbnails[0];
-			for(const thumbnail of thumbnails) {
-				selectedThumbnail = thumbnail.width > selectedThumbnail.width ? thumbnail : selectedThumbnail;
-			}
-			imageURL = selectedThumbnail.url;
+	if(!imageURL) {
+		const thumbnails = YoutubeVideoInfo.videoDetails.thumbnails;
+		let selectedThumbnail = thumbnails[0];
+		for(const thumbnail of thumbnails) {
+			selectedThumbnail = thumbnail.width > selectedThumbnail.width ? thumbnail : selectedThumbnail;
 		}
+		imageURL = selectedThumbnail.url;
+	}
 
+	return downloadURL(imageURL);
+}
+
+async function downloadURL(imageURL) {
+	return new Promise(async(resolve, reject) => {
 		https.get(imageURL, res => {
 			const imagePath = path.resolve(__dirname, `downloads/thumbnail.${res.headers["content-type"].split("/")[1]}`);
 			const writeTo = fs.createWriteStream(imagePath);
@@ -24,7 +28,7 @@ async function downloadThumbnail(YoutubeVideoInfo) {
 				resolve(imagePath);
 			});
 			res.on("error", err => {
-				console.warn("Error encountered while downloading thumbnail");
+				console.warn("Error encountered while downloading image");
 				reject(err);
 			})
 			res.pipe(writeTo);
@@ -32,4 +36,7 @@ async function downloadThumbnail(YoutubeVideoInfo) {
 	});
 }
 
-module.exports = downloadThumbnail;
+module.exports = {
+	downloadThumbnail,
+	downloadURL
+};

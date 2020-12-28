@@ -3,7 +3,7 @@ const path = require("path");
 const prompt = require("prompt");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
-const thumbnailDownload = require("./download.js");
+const downloader = require("./download.js");
 require("dotenv").config();
 
 prompt.message = "";
@@ -31,7 +31,9 @@ async function start() {
 				mp3Title: {
 					description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
 				},
-
+				coverLocation: {
+					description: "What Would You Like as the File Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+				}
 			}
 		}));
 
@@ -39,6 +41,19 @@ async function start() {
 		console.log(`Audio will be saved in ${metaData.fileName}`);
 		if(!metaData.mp3Title) metaData.mp3Title = metaData.fileName.slice(0, metaData.fileName.length - 4);
 		console.log(`Title will be set as ${metaData.mp3Title}`);
+		try {
+			if(!metaData.coverLocation) {
+				console.log("Downloading Thumbnail Image");
+				metaData.coverLocation = await downloader.downloadThumbnail(info);
+			} else {
+				console.log("Downloading Image from URL");
+				metaData.coverLocation = await downloader.downloadURL(metaData.coverLocation);
+			}
+		} catch (err) {
+			metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH;
+			console.warn(`Failed to Download Image\nUsing Default If Provided: ${metaData.coverLocation}`);
+			if(!metaData.coverLocation) throw "No Default Cover Image Provided";
+		}
 
 		console.log("========== Download Started ==========");
 
@@ -98,7 +113,7 @@ async function addMetaData(mp3Path, metaData) {
 	return new Promise((resolve, reject) => {
 		const renameProcess = ffmpeg(mp3Path);
 		renameProcess
-			.addOutputOptions('-i', path.resolve(__dirname, `downloads/cover.png`), '-map', '0:0', '-map', '1:0', '-c', 'copy', '-id3v2_version', '3')
+			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation), '-map', '0:0', '-map', '1:0', '-c', 'copy', '-id3v2_version', '3')
 			.on("end", err => {
 				if(err) {
 					console.warn("Something went wrong while adding a cover image");
