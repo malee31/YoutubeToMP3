@@ -113,7 +113,7 @@ async function addMetaData(mp3Path, metaData) {
 	return new Promise((resolve, reject) => {
 		const renameProcess = ffmpeg(mp3Path);
 		renameProcess
-			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation), '-map', '0:0', '-map', '1:0', '-c', 'copy', '-id3v2_version', '3')
+			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation), '-map', '0:0', '-map', '1:0', '-c', 'copy', '-id3v2_version', '3', '-metadata', `title=${metaData.mp3Title}`)
 			.on("end", err => {
 				if(err) {
 					console.warn("Something went wrong while adding a cover image");
