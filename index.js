@@ -1,9 +1,9 @@
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
 const prompt = require("prompt");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
-const downloader = require("./download.js");
 require("dotenv").config();
 
 prompt.message = "";
@@ -33,6 +33,9 @@ async function start() {
 				},
 				coverLocation: {
 					description: "What Would You Like as the File Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+				},
+				creator: {
+					description: "Who is the Content Creator? (Leave Blank to Skip)"
 				}
 			}
 		}));
@@ -44,22 +47,21 @@ async function start() {
 		try {
 			if(!metaData.coverLocation) {
 				console.log("Downloading Thumbnail Image");
-				metaData.coverLocation = await downloader.downloadThumbnail(info);
+				metaData.coverLocation = await downloadThumbnail(info);
 			} else {
 				console.log("Downloading Image from URL");
-				metaData.coverLocation = await downloader.downloadURL(metaData.coverLocation);
+				metaData.coverLocation = await downloadURL(metaData.coverLocation);
 			}
-		} catch (err) {
-			metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH;
+		} catch(err) {
+			metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
 			console.warn(`Failed to Download Image\nUsing Default If Provided: ${metaData.coverLocation}`);
 			if(!metaData.coverLocation) throw "No Default Cover Image Provided";
 		}
 
 		console.log("========== Download Started ==========");
-
 		let downloadedPath = await ytDownload(info, url);
-		downloadedPath = await convertToMp3(downloadedPath);
-		downloadedPath = await addMetaData(downloadedPath, metaData);
+		console.log("========== Converting to MP3 ==========");
+		downloadedPath = await convertToMp3(downloadedPath, metaData);
 		console.log(`Final Result Saved To: ${downloadedPath}`);
 		resolve();
 	});
@@ -91,37 +93,59 @@ async function ytDownload(info, url) {
 	});
 }
 
-async function convertToMp3(filePath) {
+async function downloadThumbnail(YoutubeVideoInfo) {
+	let imageURL;
+
+	if(!imageURL) {
+		const thumbnails = YoutubeVideoInfo.videoDetails.thumbnails;
+		let selectedThumbnail = thumbnails[0];
+		for(const thumbnail of thumbnails) {
+			selectedThumbnail = thumbnail.width > selectedThumbnail.width ? thumbnail : selectedThumbnail;
+		}
+		imageURL = selectedThumbnail.url;
+	}
+
+	return downloadURL(imageURL);
+}
+
+async function downloadURL(imageURL) {
+	return new Promise(async(resolve, reject) => {
+		https.get(imageURL, res => {
+			const imagePath = path.resolve(__dirname, `downloads/thumbnail.${res.headers["content-type"].split("/")[1]}`);
+			const writeTo = fs.createWriteStream(imagePath);
+			res.on("end", () => {
+				console.log("Download End");
+				resolve(imagePath);
+			});
+			res.on("error", err => {
+				console.warn("Error encountered while downloading image");
+				reject(err);
+			})
+			res.pipe(writeTo);
+		})
+	});
+}
+
+async function convertToMp3(filePath, metaData) {
 	return new Promise((resolve, reject) => {
-		const newPath = path.resolve(__dirname, `downloads/temp.mp3`);
+		const saveTo = path.resolve(process.env.SAVE_DESTINATION || path.resolve(__dirname, "downloads"), metaData.fileName);
 		const ffmpegProcess = ffmpeg(filePath);
-		ffmpegProcess.format("mp3")
+		ffmpegProcess
+			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation))
+			.format("mp3")
 			.on("error", err => {
 				console.log("Something went wrong while converting to MP3");
 				reject(err);
 			})
 			.on("end", () => {
-				console.log('========== MP3 Conversion Finished ==========');
-				resolve(newPath);
-			}).save(newPath);
-		//ffmpegProcess.addOutputOption('-metadata', 'title="Mp3 Name"');
-	});
-}
-
-async function addMetaData(mp3Path, metaData) {
-	const saveTo = path.resolve(__dirname, `downloads/${metaData.fileName}`);
-	return new Promise((resolve, reject) => {
-		const renameProcess = ffmpeg(mp3Path);
-		renameProcess
-			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation), '-map', '0:0', '-map', '1:0', '-c', 'copy', '-id3v2_version', '3', '-metadata', `title=${metaData.mp3Title}`)
-			.on("end", err => {
-				if(err) {
-					console.warn("Something went wrong while adding a cover image");
-					reject(err);
-				}
+				console.log('========== Converted ==========');
 				resolve(saveTo);
 			})
-			.save(saveTo);
+			.addOutputOptions('-map', '0:0', '-map', '1:0', '-id3v2_version', '3', '-metadata', `title=${metaData.mp3Title}`);
+
+		// Attaching additional/optional metadata
+		if(metaData.creator) ffmpegProcess.addOutputOptions('-metadata', `artist=${metaData.creator}`);
+		ffmpegProcess.save(saveTo);
 	});
 }
 
