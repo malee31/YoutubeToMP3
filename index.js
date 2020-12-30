@@ -28,22 +28,34 @@ async function start() {
 				fileName: {
 					description: "What File Name Would You Like to Give the Audio File?"
 				},
-				mp3Title: {
+				title: {
 					description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
 				},
 				coverLocation: {
-					description: "What Would You Like as the File Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+					description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
 				},
 				creator: {
-					description: "Who is the Content Creator? (Leave Blank to Skip)"
+					description: "Who is the Creator? (Leave Blank to Skip)"
+				},
+				album: {
+					description: "What is the Album Name? (Leave Blank to Skip)"
+				},
+				track: {
+					description: "What is the Track Number? (Leave Blank to Skip)"
+				},
+				genre: {
+					description: "What Genre? (Leave Blank to Skip)"
+				},
+				year: {
+					description: "What Year was this Released? (Leave Blank to Skip)"
 				}
 			}
 		}));
 
 		if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
 		console.log(`Audio will be saved in ${metaData.fileName}`);
-		if(!metaData.mp3Title) metaData.mp3Title = metaData.fileName.slice(0, metaData.fileName.length - 4);
-		console.log(`Title will be set as ${metaData.mp3Title}`);
+		if(!metaData.title) metaData.title = metaData.fileName.slice(0, metaData.fileName.length - 4);
+		console.log(`Title will be set as ${metaData.title}`);
 		try {
 			if(!metaData.coverLocation) {
 				console.log("Downloading Thumbnail Image");
@@ -141,10 +153,22 @@ async function convertToMp3(filePath, metaData) {
 				console.log('========== Converted ==========');
 				resolve(saveTo);
 			})
-			.addOutputOptions('-map', '0:0', '-map', '1:0', '-id3v2_version', '3', '-metadata', `title=${metaData.mp3Title}`);
+			.addOutputOptions('-map', '0:0', '-map', '1:0', '-id3v2_version', '3');
 
 		// Attaching additional/optional metadata
-		if(metaData.creator) ffmpegProcess.addOutputOptions('-metadata', `artist=${metaData.creator}`);
+		const checkAndSet = (prop, name) => {
+			if(!name) name = prop;
+			if(metaData[prop]) ffmpegProcess.addOutputOptions('-metadata', `${name}=${metaData[prop]}`);
+		};
+		checkAndSet("creator", "author");
+		checkAndSet("creator", "composer");
+		checkAndSet("creator", "artist");
+		checkAndSet("creator", "album_artist");
+		checkAndSet("title");
+		checkAndSet("album");
+		checkAndSet("track");
+		checkAndSet("genre");
+		checkAndSet("year");
 		ffmpegProcess.save(saveTo);
 	});
 }
