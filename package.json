@@ -4,6 +4,8 @@
 	"description": "Convert a Youtube Video from a Youtube URL to a playable MP3 with an image and meta data",
 	"main": "index.js",
 	"scripts": {
+		"start": "node .",
+		"convert": "node . true",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Marvin Lee",

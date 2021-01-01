@@ -9,86 +9,127 @@ require("dotenv").config();
 prompt.message = "";
 prompt.start();
 
-async function start() {
-	return new Promise(async resolve => {
-		let {url} = await prompt.get({
-			properties: {
-				url: {
-					description: "Paste the Youtube Video URL Here"
-				}
-			}
-		});
-
-		const info = await ytdl.getInfo(url);
-		url = info.videoDetails.video_url;
-		console.log(`Processed Youtube URL: ${url}`);
-
-		let metaData = (await prompt.get({
-			properties: {
-				fileName: {
-					description: "What File Name Would You Like to Give the Audio File?"
-				},
-				title: {
-					description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
-				},
-				coverLocation: {
-					description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
-				},
-				creator: {
-					description: "Who is the Creator? (Leave Blank to Skip)"
-				},
-				album: {
-					description: "What is the Album Name? (Leave Blank to Skip)"
-				},
-				track: {
-					description: "What is the Track Number? (Leave Blank to Skip)"
-				},
-				genre: {
-					description: "What Genre? (Leave Blank to Skip)"
-				},
-				year: {
-					description: "What Year was this Released? (Leave Blank to Skip)"
-				}
-			}
-		}));
-
-		if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
-		console.log(`Audio will be saved in ${metaData.fileName}`);
-		if(!metaData.title) metaData.title = metaData.fileName.slice(0, metaData.fileName.length - 4);
-		console.log(`Title will be set as ${metaData.title}`);
-		try {
-			if(!metaData.coverLocation) {
-				console.log("Downloading Thumbnail Image");
-				metaData.coverLocation = await downloadThumbnail(info);
-			} else {
-				console.log("Downloading Image from URL");
-				metaData.coverLocation = await downloadURL(metaData.coverLocation);
-			}
-		} catch(err) {
-			metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
-			console.warn(`Failed to Download Image\nUsing Default If Provided: ${metaData.coverLocation}`);
-			if(!metaData.coverLocation) throw "No Default Cover Image Provided";
-		}
-
-		console.log("========== Download Started ==========");
-		let downloadedPath = await ytDownload(info, url);
-		console.log("========== Converting to MP3 ==========");
-		downloadedPath = await convertToMp3(downloadedPath, metaData);
-		console.log(`Final Result Saved To: ${downloadedPath}`);
-		resolve();
+async function promptAdd(obj, prompts) {
+	let responses = await prompt.get(prompts, {
+		properties: prompts
 	});
+
+	for(const promptKey in responses) {
+		if(responses.hasOwnProperty(promptKey)) obj[promptKey] = responses[promptKey];
+	}
+	return obj;
 }
 
-async function ytDownload(info, url) {
+async function metaDataPrompt(ytdlInfo) {
+	// TODO: Make a way to permanently disable asking for some of the optional properties with a config file
+	//  Use the promptAdd function to do so
+	const metaData = await prompt.get({
+		properties: {
+			fileName: {
+				description: "What File Name Would You Like to Give the Audio File?",
+				required: true
+			},
+			title: {
+				description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
+			},
+			coverLocation: {
+				description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+			},
+			creator: {
+				description: "Who is the Creator? (Leave Blank to Skip)"
+			},
+			album: {
+				description: "What is the Album Name? (Leave Blank to Skip)"
+			},
+			track: {
+				description: "What is the Track Number? (Leave Blank to Skip)"
+			},
+			genre: {
+				description: "What Genre? (Leave Blank to Skip)"
+			},
+			year: {
+				description: "What Year was this Released? (Leave Blank to Skip)",
+				type: "integer",
+				pattern: /^[12][0-9]{3}$/,
+				message: "Must be a valid year number"
+			}
+		}
+	});
+
+	if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
+	console.log(`Audio will be saved in ${metaData.fileName}`);
+	if(!metaData.title) metaData.title = metaData.fileName.slice(0, metaData.fileName.length - 4);
+	console.log(`Title will be set as ${metaData.title}`);
+
+	// Messy Cover Image Download Code
+	try {
+		if(!metaData.coverLocation) {
+			console.log("Downloading Thumbnail Image");
+			// Code is depending on the download to fail so it can be caught if no ytdlInfo is provided
+			// Kinda bad style but it works
+			metaData.coverLocation = await downloadThumbnail(ytdlInfo);
+		} else {
+			console.log("Downloading Image from URL");
+			metaData.coverLocation = await downloadURL(metaData.coverLocation);
+		}
+	} catch(err) {
+		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
+		console.warn(`Failed to Download Image\nDefaulting to ${metaData.coverLocation}`);
+	}
+
+	return metaData;
+}
+
+async function start() {
+	let {url} = await prompt.get({
+		properties: {
+			url: {
+				description: "Paste the Youtube Video URL Here",
+				required: true
+			}
+		}
+	});
+
+	const info = await ytdl.getInfo(url);
+	url = info.videoDetails.video_url;
+	console.log(`Processed Youtube URL: ${url}`);
+
+	const metaData = await metaDataPrompt(info);
+
+	console.log("========== Download Started ==========");
+	let downloadedPath = await ytDownload(info, url);
+	console.log("========== Converting to MP3 =========");
+	downloadedPath = await convertToMp3(downloadedPath, metaData);
+	console.log(`Final Result Saved To: ${downloadedPath}`);
+}
+
+async function metaDataEdit() {
+	let {filePath} = await prompt.get({
+		properties: {
+			filePath: {
+				description: "Paste the Absolute Path of the MP3 to Edit Here",
+				required: true
+			}
+		}
+	});
+
+	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
+	const metaData = metaDataPrompt();
+
+	console.log("========== Converting to MP3 =========");
+	filePath = await convertToMp3(filePath, metaData);
+	console.log(`Final Result Saved To: ${filePath}`);
+}
+
+function ytDownload(info, url) {
+	let format = ytdl.chooseFormat(info.formats, {
+		quality: "highestaudio",
+		filter: "audioonly"
+	});
+	const ytDownloadPath = path.resolve(__dirname, `downloads/temp.${format.container}`);
+	let youtubeDownload = ytdl(url, {format: format});
+
 	return new Promise((resolve, reject) => {
-		let format = ytdl.chooseFormat(info.formats, {
-			quality: "highestaudio",
-			filter: "audioonly"
-		});
-
-		const ytDownloadPath = path.resolve(__dirname, `downloads/temp.${format.container}`);
-		let youtubeDownload = ytdl(url, {format: format});
-
 		youtubeDownload.on("error", err => {
 			console.warn("Something went wrong while downloading video");
 			reject(err);
@@ -120,7 +161,7 @@ async function downloadThumbnail(YoutubeVideoInfo) {
 	return downloadURL(imageURL);
 }
 
-async function downloadURL(imageURL) {
+function downloadURL(imageURL) {
 	return new Promise(async(resolve, reject) => {
 		https.get(imageURL, res => {
 			const imagePath = path.resolve(__dirname, `downloads/thumbnail.${res.headers["content-type"].split("/")[1]}`);
@@ -138,10 +179,11 @@ async function downloadURL(imageURL) {
 	});
 }
 
-async function convertToMp3(filePath, metaData) {
+function convertToMp3(filePath, metaData) {
+	const saveTo = path.resolve(process.env.SAVE_DESTINATION || path.resolve(__dirname, "downloads"), metaData.fileName);
+	const ffmpegProcess = ffmpeg(filePath);
+
 	return new Promise((resolve, reject) => {
-		const saveTo = path.resolve(process.env.SAVE_DESTINATION || path.resolve(__dirname, "downloads"), metaData.fileName);
-		const ffmpegProcess = ffmpeg(filePath);
 		ffmpegProcess
 			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation))
 			.format("mp3")
@@ -169,11 +211,20 @@ async function convertToMp3(filePath, metaData) {
 		checkAndSet("track");
 		checkAndSet("genre");
 		checkAndSet("year");
+		// checkAndSet("grouping");
+		// checkAndSet("description");
+		// checkAndSet("synopsis");
+		// checkAndSet("network");
+		// checkAndSet("show");
+		// checkAndSet("episode_id");
+		// checkAndSet("comment");
+		// checkAndSet("copyright");
+		// checkAndSet("lyrics");
 		ffmpegProcess.save(saveTo);
 	});
 }
 
-start().then(() => {
+(Boolean(process.argv[2]) ? metaDataEdit : start)().then(() => {
 	console.log("========== Success! ==========");
 }).catch(err => {
 	console.warn("⚠⚠⚠ Something went wrong ⚠⚠⚠\n⚠⚠⚠ Shutting down ⚠⚠⚠");
