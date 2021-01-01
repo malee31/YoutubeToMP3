@@ -1,0 +1,10 @@
+{
+	"disable": {
+		"coverLocation": false,
+		"creator": false,
+		"album": false,
+		"track": false,
+		"genre": false,
+		"year": false
+	}
+}

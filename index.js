@@ -6,23 +6,45 @@ const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
 require("dotenv").config();
 
+const config = {};
+
+function loadConfig() {
+	return new Promise((resolve, reject) => {
+		fs.readFile(path.resolve(__dirname, "config.json"), (err, res) => {
+			if(err) {
+				if(err.code !== "ENOENT") {
+					console.warn("Error reading file:")
+					reject(err);
+				}
+				resolve(config);
+			}
+			Object.assign(config, JSON.parse(res.toString()));
+			resolve(config);
+		});
+	});
+}
+
 prompt.message = "";
 prompt.start();
 
-async function promptAdd(obj, prompts) {
-	let responses = await prompt.get(prompts, {
+async function promptAdd(obj, prompts, checkConfig = false) {
+	prompts = Object.assign({}, prompts);
+	for(const key in prompts) {
+		if(prompts.hasOwnProperty(key) && checkConfig && config.disable[key]) delete prompts[key];
+	}
+
+	let responses = await prompt.get({
 		properties: prompts
 	});
 
-	for(const promptKey in responses) {
-		if(responses.hasOwnProperty(promptKey)) obj[promptKey] = responses[promptKey];
-	}
+	Object.assign(obj, responses);
 	return obj;
 }
 
 async function metaDataPrompt(ytdlInfo) {
 	// TODO: Make a way to permanently disable asking for some of the optional properties with a config file
 	//  Use the promptAdd function to do so
+	await loadConfig();
 	const metaData = await prompt.get({
 		properties: {
 			fileName: {
@@ -31,30 +53,42 @@ async function metaDataPrompt(ytdlInfo) {
 			},
 			title: {
 				description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
-			},
-			coverLocation: {
-				description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
-			},
-			creator: {
-				description: "Who is the Creator? (Leave Blank to Skip)"
-			},
-			album: {
-				description: "What is the Album Name? (Leave Blank to Skip)"
-			},
-			track: {
-				description: "What is the Track Number? (Leave Blank to Skip)"
-			},
-			genre: {
-				description: "What Genre? (Leave Blank to Skip)"
-			},
-			year: {
-				description: "What Year was this Released? (Leave Blank to Skip)",
-				type: "integer",
-				pattern: /^[12][0-9]{3}$/,
-				message: "Must be a valid year number"
 			}
 		}
 	});
+	await promptAdd(metaData, {
+		coverLocation: {
+			description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+		}
+	}, true);
+	await promptAdd(metaData, {
+		creator: {
+			description: "Who is the Creator? (Leave Blank to Skip)"
+		}
+	}, true);
+	await promptAdd(metaData, {
+		album: {
+			description: "What is the Album Name? (Leave Blank to Skip)"
+		}
+	}, true);
+	await promptAdd(metaData, {
+		track: {
+			description: "What is the Track Number? (Leave Blank to Skip)"
+		}
+	}, true);
+	await promptAdd(metaData, {
+		genre: {
+			description: "What Genre? (Leave Blank to Skip)"
+		}
+	}, true);
+	await promptAdd(metaData, {
+		year: {
+			description: "What Year was this Released? (Leave Blank to Skip)",
+			type: "integer",
+			pattern: /^[12][0-9]{3}$/,
+			message: "Must be a valid year number"
+		}
+	}, true);
 
 	if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
 	console.log(`Audio will be saved in ${metaData.fileName}`);
