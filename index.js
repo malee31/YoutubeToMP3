@@ -1,3 +1,7 @@
+// Putting all the code in one file was intentional so it would be easier to copy and paste for testing
+// Please don't kill me for this ;-;
+// If you have to read the source code, I apologize lol
+
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
@@ -42,17 +46,15 @@ async function promptAdd(obj, prompts, checkConfig = false) {
 }
 
 async function metaDataPrompt(ytdlInfo) {
-	// TODO: Make a way to permanently disable asking for some of the optional properties with a config file
-	//  Use the promptAdd function to do so
 	await loadConfig();
 	const metaData = await prompt.get({
 		properties: {
 			fileName: {
-				description: "What File Name Would You Like to Give the Audio File?",
+				description: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
 				required: true
 			},
 			title: {
-				description: "What Would You Like to Title the File? (Leave Blank to Set File Name as Title)"
+				description: `What Would You Like to Title the File? (Leave Blank to Set File Name as Title)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`
 			}
 		}
 	});
@@ -61,9 +63,10 @@ async function metaDataPrompt(ytdlInfo) {
 			description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
 		}
 	}, true);
+
 	await promptAdd(metaData, {
 		creator: {
-			description: "Who is the Creator? (Leave Blank to Skip)"
+			description: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`
 		}
 	}, true);
 	await promptAdd(metaData, {
@@ -83,7 +86,7 @@ async function metaDataPrompt(ytdlInfo) {
 	}, true);
 	await promptAdd(metaData, {
 		year: {
-			description: "What Year was this Released? (Leave Blank to Skip)",
+			description: `What Year was this Released? (Leave Blank to Skip)${ytdlInfo ? ` <Uploaded: ${ytdlInfo.videoDetails.uploadDate}>` : ""}`,
 			type: "integer",
 			pattern: /^[12][0-9]{3}$/,
 			message: "Must be a valid year number"
@@ -99,7 +102,7 @@ async function metaDataPrompt(ytdlInfo) {
 	try {
 		if(!metaData.coverLocation) {
 			console.log("Downloading Thumbnail Image");
-			// Code is depending on the download to fail so it can be caught if no ytdlInfo is provided
+			// Code is depending on the download to fail and throw an error so it can be caught if no ytdlInfo is provided
 			// Kinda bad style but it works
 			metaData.coverLocation = await downloadThumbnail(ytdlInfo);
 		} else {
@@ -148,7 +151,8 @@ async function metaDataEdit() {
 	});
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
-	const metaData = metaDataPrompt();
+	console.warn(`Editing file at ${filePath}`)
+	const metaData = await metaDataPrompt();
 
 	console.log("========== Converting to MP3 =========");
 	filePath = await convertToMp3(filePath, metaData);

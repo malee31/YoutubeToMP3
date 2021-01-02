@@ -14,7 +14,7 @@
 		"dotenv": "^8.2.0",
 		"fluent-ffmpeg": "^2.1.2",
 		"prompt": "^1.1.0",
-		"ytdl-core": "^4.2.1"
+		"ytdl-core": "^4.3.0"
 	},
 	"devDependencies": {},
 	"repository": {
@@ -25,6 +25,7 @@
 		"Youtube",
 		"mp3",
 		"converter",
+		"id3v2",
 		"ffmpeg",
 		"ytdl"
 	],
