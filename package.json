@@ -14,9 +14,9 @@
 		"dotenv": "^8.2.0",
 		"fluent-ffmpeg": "^2.1.2",
 		"prompt": "^1.1.0",
-		"ytdl-core": "^4.3.0"
+		"prompt-set": "^1.0.0",
+		"ytdl-core": "^4.8.3"
 	},
-	"devDependencies": {},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/malee31/YoutubeToRichMP3.git"

@@ -8,6 +8,7 @@ const https = require("https");
 const prompt = require("prompt");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
+const PromptSet = require("prompt-set");
 require("dotenv").config();
 
 const config = {};
@@ -47,51 +48,51 @@ async function promptAdd(obj, prompts, checkConfig = false) {
 
 async function metaDataPrompt(ytdlInfo) {
 	await loadConfig();
-	const metaData = await prompt.get({
-		properties: {
-			fileName: {
-				description: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
-				required: true
-			},
-			title: {
-				description: `What Would You Like to Title the File? (Leave Blank to Set File Name as Title)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`
-			}
-		}
-	});
-	await promptAdd(metaData, {
-		coverLocation: {
-			description: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
-		}
-	}, true);
-
-	await promptAdd(metaData, {
-		creator: {
-			description: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`
-		}
-	}, true);
-	await promptAdd(metaData, {
-		album: {
-			description: "What is the Album Name? (Leave Blank to Skip)"
-		}
-	}, true);
-	await promptAdd(metaData, {
-		track: {
-			description: "What is the Track Number? (Leave Blank to Skip)"
-		}
-	}, true);
-	await promptAdd(metaData, {
-		genre: {
-			description: "What Genre? (Leave Blank to Skip)"
-		}
-	}, true);
-	await promptAdd(metaData, {
-		year: {
-			description: `What Year was this Released? (Leave Blank to Skip)${ytdlInfo ? ` <Uploaded: ${ytdlInfo.videoDetails.uploadDate}>` : ""}`,
-			type: "integer",
-			pattern: /^[12][0-9]{3}$/,
-			message: "Must be a valid year number"
-		}
-	}, true);
+	const metaData = await PromptSet.chain()
+		.addNew("Edit Filename",
+			{
+				name: "fileName",
+				message: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
+				validate: val => val.trim().length !== 0
+			}, true)
+		.addNew("Edit File Title",
+			{
+				name: "title",
+				message: `What Would You Like to Title the File? (Leave Blank to Set File Name as Title)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
+				default: ytdlInfo.videoDetails.title
+			}, true)
+		.addNew("Edit Cover Image",
+			{
+				name: "coverLocation",
+				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
+			}, true)
+		.addNew("Edit Cover Image",
+			{
+				name: "creator",
+				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`
+			}, true)
+		.addNew("Edit Album Name",
+			{
+				name: "album",
+				message: "What is the Album Name? (Leave Blank to Skip)"
+			}, true)
+		.addNew("Edit Track Number",
+			{
+				name: "track",
+				message: "What is the Track Number? (Leave Blank to Skip)"
+			}, true)
+		.addNew("Edit Genre Number",
+			{
+				name: "genre",
+				message: "What Genre? (Leave Blank to Skip)"
+			}, true)
+		.addNew("Edit Release Year",
+			{
+				name: "year",
+				message: `What Year was this Released? (Leave Blank to Skip)${ytdlInfo ? ` <Uploaded: ${ytdlInfo.videoDetails.uploadDate}>` : ""}`,
+				validate: val => /^[12][0-9]{3}$/.test(val)
+			}, true)
+		.start();
 
 	if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
 	console.log(`Audio will be saved in ${metaData.fileName}`);
@@ -118,7 +119,7 @@ async function metaDataPrompt(ytdlInfo) {
 }
 
 async function start() {
-	let {url} = await prompt.get({
+	let { url } = await prompt.get({
 		properties: {
 			url: {
 				description: "Paste the Youtube Video URL Here",
@@ -141,7 +142,7 @@ async function start() {
 }
 
 async function metaDataEdit() {
-	let {filePath} = await prompt.get({
+	let { filePath } = await prompt.get({
 		properties: {
 			filePath: {
 				description: "Paste the Absolute Path of the MP3 to Edit Here",
@@ -165,7 +166,7 @@ function ytDownload(info, url) {
 		filter: "audioonly"
 	});
 	const ytDownloadPath = path.resolve(__dirname, `downloads/temp.${format.container}`);
-	let youtubeDownload = ytdl(url, {format: format});
+	let youtubeDownload = ytdl(url, { format: format });
 
 	return new Promise((resolve, reject) => {
 		youtubeDownload.on("error", err => {
