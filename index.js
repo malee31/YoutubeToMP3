@@ -5,7 +5,6 @@
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
-const prompt = require("prompt");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
 const PromptSet = require("prompt-set");
@@ -29,23 +28,6 @@ function loadConfig() {
 	});
 }
 
-prompt.message = "";
-prompt.start();
-
-async function promptAdd(obj, prompts, checkConfig = false) {
-	prompts = Object.assign({}, prompts);
-	for(const key in prompts) {
-		if(prompts.hasOwnProperty(key) && checkConfig && config.disable[key]) delete prompts[key];
-	}
-
-	let responses = await prompt.get({
-		properties: prompts
-	});
-
-	Object.assign(obj, responses);
-	return obj;
-}
-
 async function metaDataPrompt(ytdlInfo) {
 	await loadConfig();
 	const metaData = await PromptSet.chain()
@@ -66,7 +48,7 @@ async function metaDataPrompt(ytdlInfo) {
 				name: "coverLocation",
 				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
 			}, true)
-		.addNew("Edit Cover Image",
+		.addNew("Edit Creator Name",
 			{
 				name: "creator",
 				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`
@@ -81,7 +63,7 @@ async function metaDataPrompt(ytdlInfo) {
 				name: "track",
 				message: "What is the Track Number? (Leave Blank to Skip)"
 			}, true)
-		.addNew("Edit Genre Number",
+		.addNew("Edit Genre",
 			{
 				name: "genre",
 				message: "What Genre? (Leave Blank to Skip)"
@@ -119,14 +101,13 @@ async function metaDataPrompt(ytdlInfo) {
 }
 
 async function start() {
-	let { url } = await prompt.get({
-		properties: {
-			url: {
-				description: "Paste the Youtube Video URL Here",
-				required: true
-			}
-		}
-	});
+	let { url } = await PromptSet.chain()
+		.addNew("Youtube URL",
+			{
+				name: "url",
+				message: "Paste the Youtube Video URL Here",
+				validate: val => val.trim().length !== 0
+			}).start();
 
 	const info = await ytdl.getInfo(url);
 	url = info.videoDetails.video_url;
@@ -142,14 +123,13 @@ async function start() {
 }
 
 async function metaDataEdit() {
-	let { filePath } = await prompt.get({
-		properties: {
-			filePath: {
-				description: "Paste the Absolute Path of the MP3 to Edit Here",
-				required: true
-			}
-		}
-	});
+	let { filePath } = await PromptSet.chain()
+		.addNew("File Path",
+			{
+				name: "filePath",
+				message: "Paste the Absolute Path of the MP3 to Edit Here",
+				validate: val => val.trim().length !== 0
+			});
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
 	console.warn(`Editing file at ${filePath}`)

@@ -13,7 +13,6 @@
 	"dependencies": {
 		"dotenv": "^8.2.0",
 		"fluent-ffmpeg": "^2.1.2",
-		"prompt": "^1.1.0",
 		"prompt-set": "^1.0.0",
 		"ytdl-core": "^4.8.3"
 	},
