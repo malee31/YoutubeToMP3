@@ -7,7 +7,7 @@ const path = require("path");
 const https = require("https");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
-const PromptSet = require("prompt-set");
+const Set = require("prompt-set");
 require("dotenv").config();
 
 const config = {};
@@ -30,50 +30,60 @@ function loadConfig() {
 
 async function metaDataPrompt(ytdlInfo) {
 	await loadConfig();
-	const metaData = await PromptSet.chain()
-		.addNew("Edit Filename",
+	const metaData = await Set.PromptSet()
+		.addNew([
 			{
 				name: "fileName",
+				optionName: "Edit Filename",
 				message: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
-				validate: val => val.trim().length !== 0
-			}, true)
-		.addNew("Edit File Title",
+				validate: val => val.trim().length !== 0,
+				editable: true
+			},
 			{
 				name: "title",
+				optionName: "Edit File Title",
 				message: `What Would You Like to Title the File? (Leave Blank to Set File Name as Title)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
-				default: ytdlInfo.videoDetails.title
-			}, true)
-		.addNew("Edit Cover Image",
+				default: ytdlInfo.videoDetails.title,
+				editable: true
+			},
 			{
 				name: "coverLocation",
-				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)"
-			}, true)
-		.addNew("Edit Creator Name",
+				optionName: "Edit Cover Image",
+				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)",
+				editable: true
+			},
 			{
 				name: "creator",
-				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`
-			}, true)
-		.addNew("Edit Album Name",
+				optionName: "Edit Creator Name",
+				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`,
+				editable: true
+			},
 			{
 				name: "album",
-				message: "What is the Album Name? (Leave Blank to Skip)"
-			}, true)
-		.addNew("Edit Track Number",
+				optionName: "Edit Album Name",
+				message: "What is the Album Name? (Leave Blank to Skip)",
+				editable: true
+			},
 			{
 				name: "track",
-				message: "What is the Track Number? (Leave Blank to Skip)"
-			}, true)
-		.addNew("Edit Genre",
+				optionName: "Edit Track Number",
+				message: "What is the Track Number? (Leave Blank to Skip)",
+				editable: true
+			},
 			{
 				name: "genre",
-				message: "What Genre? (Leave Blank to Skip)"
-			}, true)
-		.addNew("Edit Release Year",
+				optionName: "Edit Genre",
+				message: "What Genre? (Leave Blank to Skip)",
+				editable: true
+			},
 			{
 				name: "year",
+				optionName: "Edit Release Year",
 				message: `What Year was this Released? (Leave Blank to Skip)${ytdlInfo ? ` <Uploaded: ${ytdlInfo.videoDetails.uploadDate}>` : ""}`,
-				validate: val => /^[12][0-9]{3}$/.test(val)
-			}, true)
+				validate: val => /^[12][0-9]{3}$/.test(val),
+				editable: true
+			}
+		])
 		.start();
 
 	if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
@@ -101,13 +111,13 @@ async function metaDataPrompt(ytdlInfo) {
 }
 
 async function start() {
-	let { url } = await PromptSet.chain()
-		.addNew("Youtube URL",
-			{
-				name: "url",
-				message: "Paste the Youtube Video URL Here",
-				validate: val => val.trim().length !== 0
-			}).start();
+	let { url } = await Set.PromptSet()
+		.addNew({
+			name: "url",
+			optionName: "Youtube URL",
+			message: "Paste the Youtube Video URL Here",
+			validate: val => val.trim().length !== 0
+		}).start();
 
 	const info = await ytdl.getInfo(url);
 	url = info.videoDetails.video_url;
@@ -123,13 +133,13 @@ async function start() {
 }
 
 async function metaDataEdit() {
-	let { filePath } = await PromptSet.chain()
-		.addNew("File Path",
-			{
-				name: "filePath",
-				message: "Paste the Absolute Path of the MP3 to Edit Here",
-				validate: val => val.trim().length !== 0
-			});
+	let { filePath } = await Set.PromptSet()
+		.addNew({
+			name: "filePath",
+			optionName: "File Path",
+			message: "Paste the Absolute Path of the MP3 to Edit Here",
+			validate: val => val.trim().length !== 0
+		});
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
 	console.warn(`Editing file at ${filePath}`)
