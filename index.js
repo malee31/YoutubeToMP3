@@ -10,26 +10,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const Set = require("prompt-set");
 require("dotenv").config();
 
-const config = {};
-
-function loadConfig() {
-	return new Promise((resolve, reject) => {
-		fs.readFile(path.resolve(__dirname, "config.json"), (err, res) => {
-			if(err) {
-				if(err.code !== "ENOENT") {
-					console.warn("Error reading file:")
-					reject(err);
-				}
-				resolve(config);
-			}
-			Object.assign(config, JSON.parse(res.toString()));
-			resolve(config);
-		});
-	});
-}
-
 async function metaDataPrompt(ytdlInfo) {
-	await loadConfig();
 	const metaData = await Set.PromptSet()
 		.addNew([
 			{
@@ -111,16 +92,23 @@ async function metaDataPrompt(ytdlInfo) {
 }
 
 async function start() {
-	let { url } = await Set.PromptSet()
+	let info;
+	await Set.PromptSet()
 		.addNew({
 			name: "url",
-			optionName: "Youtube URL",
-			message: "Paste the Youtube Video URL Here",
-			validate: val => val.trim().length !== 0
-		}).start();
+			message: "Paste the Youtube Video URL Here"
+		})
+		.addValidator(async val => {
+			try {
+				info = await ytdl.getInfo(val);
+				return true;
+			} catch(e) {
+				return "Invalid Youtube Video URL";
+			}
+		})
+		.start();
 
-	const info = await ytdl.getInfo(url);
-	url = info.videoDetails.video_url;
+	const url = info.videoDetails.video_url;
 	console.log(`Processed Youtube URL: ${url}`);
 
 	const metaData = await metaDataPrompt(info);
@@ -139,7 +127,7 @@ async function metaDataEdit() {
 			optionName: "File Path",
 			message: "Paste the Absolute Path of the MP3 to Edit Here",
 			validate: val => val.trim().length !== 0
-		});
+		}).start();
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
 	console.warn(`Editing file at ${filePath}`)
