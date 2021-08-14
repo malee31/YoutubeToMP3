@@ -17,7 +17,7 @@ async function metaDataPrompt(ytdlInfo) {
 				name: "fileName",
 				optionName: "Edit Filename",
 				message: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
-				validate: val => val.trim().length !== 0,
+				allowBlank: false,
 				editable: true
 			},
 			{
@@ -96,14 +96,14 @@ async function start() {
 	await Set.PromptSet()
 		.addNew({
 			name: "url",
-			message: "Paste the Youtube Video URL Here"
-		})
-		.addValidator(async val => {
-			try {
-				info = await ytdl.getInfo(val);
-				return true;
-			} catch(e) {
-				return "Invalid Youtube Video URL";
+			message: "Paste the Youtube Video URL Here",
+			validate: async val => {
+				try {
+					info = await ytdl.getInfo(val);
+					return true;
+				} catch(e) {
+					return "Invalid Youtube Video URL";
+				}
 			}
 		})
 		.start();
@@ -126,7 +126,7 @@ async function metaDataEdit() {
 			name: "filePath",
 			optionName: "File Path",
 			message: "Paste the Absolute Path of the MP3 to Edit Here",
-			validate: val => val.trim().length !== 0
+			allowBlank: false
 		}).start();
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
