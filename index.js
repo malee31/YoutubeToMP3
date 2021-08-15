@@ -7,23 +7,42 @@ const path = require("path");
 const https = require("https");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
-const Set = require("prompt-set");
+const PS = require("prompt-set");
+const fuzzy = require("fuzzy");
 require("dotenv").config();
 
+PS.Configurer.inquirer.registerPrompt("autocomplete", require("inquirer-autocomplete-prompt"));
+PS.Configurer.inquirer.registerPrompt("file-tree", require("inquirer-file-tree-selection-prompt"));
+
 async function metaDataPrompt(ytdlInfo) {
-	const metaData = await Set.PromptSet()
+	const metaData = await PS.PromptSet()
 		.addNew([
 			{
 				name: "fileName",
 				optionName: "Edit Filename",
 				message: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
 				allowBlank: false,
+				required: true,
 				editable: true
 			},
 			{
 				name: "title",
 				optionName: "Edit File Title",
-				message: `What Would You Like to Title the File? (Leave Blank to Set File Name as Title)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
+				message: "What Would You Like to Title the File? (Press Tab to Choose a Suggestion Below or Keep Blank to Set File Name as Title)",
+				type: "autocomplete",
+				source: async (ans, text) => {
+					text = typeof text === "string" ? text : "";
+					const title = ytdlInfo.videoDetails.title;
+					const choices = [title].concat(
+						title.split(/[~@*=_|:"'(){}\[\]\\\/\-]/g)
+							.map(str => str.trim())
+							.filter(str => str.length > 0)
+							.sort()
+					);
+					return fuzzy.filter(text, choices).map(text => text.string);
+				},
+				suggestOnly: true,
+				emptyText: "No Suggestions",
 				default: ytdlInfo.videoDetails.title,
 				editable: true
 			},
@@ -93,7 +112,7 @@ async function metaDataPrompt(ytdlInfo) {
 
 async function start() {
 	let info;
-	await Set.PromptSet()
+	await PS.PromptSet()
 		.addNew({
 			name: "url",
 			message: "Paste the Youtube Video URL Here",
@@ -121,7 +140,7 @@ async function start() {
 }
 
 async function metaDataEdit() {
-	let { filePath } = await Set.PromptSet()
+	let { filePath } = await PS.PromptSet()
 		.addNew({
 			name: "filePath",
 			optionName: "File Path",
