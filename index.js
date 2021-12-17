@@ -112,8 +112,7 @@ async function metaDataPrompt(ytdlInfo) {
 
 async function start() {
 	let info;
-	await PS.PromptSet()
-		.addNew({
+	await PS.Promptlet({
 			name: "url",
 			message: "Paste the Youtube Video URL Here",
 			validate: async val => {
@@ -124,8 +123,7 @@ async function start() {
 					return "Invalid Youtube Video URL";
 				}
 			}
-		})
-		.start();
+		}).execute();
 
 	const url = info.videoDetails.video_url;
 	console.log(`Processed Youtube URL: ${url}`);
