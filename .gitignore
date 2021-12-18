@@ -9,4 +9,5 @@ node_modules/
 
 # Private Files
 downloads/*
+!downloads/.gitkeep
 .env

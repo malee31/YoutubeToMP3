@@ -16,6 +16,7 @@ PS.Configurer.inquirer.registerPrompt("file-tree", require("inquirer-file-tree-s
 
 async function metaDataPrompt(ytdlInfo) {
 	const metaData = await PS.PromptSet()
+		.setFinishMode(2)
 		.addNew([
 			{
 				name: "fileName",
@@ -30,11 +31,11 @@ async function metaDataPrompt(ytdlInfo) {
 				optionName: "Edit File Title",
 				message: "What Would You Like to Title the File? (Press Tab to Choose a Suggestion Below or Keep Blank to Set File Name as Title)",
 				type: "autocomplete",
-				source: async (ans, text) => {
+				source: async(ans, text) => {
 					text = typeof text === "string" ? text : "";
 					const title = ytdlInfo.videoDetails.title;
 					const choices = [title].concat(
-						title.split(/[~@*=_|:"'(){}\[\]\\\/\-]/g)
+						title.split(/[~@*=_|:"'(){}\[\]\\\/\-]+/g)
 							.map(str => str.trim())
 							.filter(str => str.length > 0)
 							.sort()
@@ -43,6 +44,7 @@ async function metaDataPrompt(ytdlInfo) {
 				},
 				suggestOnly: true,
 				emptyText: "No Suggestions",
+				value: ytdlInfo.videoDetails.title,
 				default: ytdlInfo.videoDetails.title,
 				editable: true
 			},
@@ -50,37 +52,56 @@ async function metaDataPrompt(ytdlInfo) {
 				name: "coverLocation",
 				optionName: "Edit Cover Image",
 				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)",
+				default: ytdlInfo.videoDetails.thumbnails.reduce(
+					(previous, next) => {
+						return previous.width < next.width ? next : previous;
+					}
+				).url,
+				value: ytdlInfo.videoDetails.thumbnails.reduce(
+					(previous, next) => {
+						return previous.width < next.width ? next : previous;
+					}
+				).url,
 				editable: true
 			},
 			{
 				name: "creator",
 				optionName: "Edit Creator Name",
 				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`,
+				value: "",
 				editable: true
 			},
 			{
 				name: "album",
 				optionName: "Edit Album Name",
 				message: "What is the Album Name? (Leave Blank to Skip)",
+				value: "",
 				editable: true
 			},
 			{
 				name: "track",
 				optionName: "Edit Track Number",
 				message: "What is the Track Number? (Leave Blank to Skip)",
+				value: "",
+				prerequisites: ["album"],
+				allowBlank: true,
 				editable: true
 			},
 			{
 				name: "genre",
 				optionName: "Edit Genre",
 				message: "What Genre? (Leave Blank to Skip)",
+				value: "",
+				allowBlank: true,
 				editable: true
 			},
 			{
 				name: "year",
 				optionName: "Edit Release Year",
-				message: `What Year was this Released? (Leave Blank to Skip)${ytdlInfo ? ` <Uploaded: ${ytdlInfo.videoDetails.uploadDate}>` : ""}`,
+				message: `What Year was this Released? (Leave Blank to Skip) [Uploaded on ${ytdlInfo.videoDetails.uploadDate}]`,
 				validate: val => /^[12][0-9]{3}$/.test(val),
+				value: "",
+				allowBlank: true,
 				editable: true
 			}
 		])
@@ -91,20 +112,12 @@ async function metaDataPrompt(ytdlInfo) {
 	if(!metaData.title) metaData.title = metaData.fileName.slice(0, metaData.fileName.length - 4);
 	console.log(`Title will be set as ${metaData.title}`);
 
-	// Messy Cover Image Download Code
 	try {
-		if(!metaData.coverLocation) {
-			console.log("Downloading Thumbnail Image");
-			// Code is depending on the download to fail and throw an error so it can be caught if no ytdlInfo is provided
-			// Kinda bad style but it works
-			metaData.coverLocation = await downloadThumbnail(ytdlInfo);
-		} else {
-			console.log("Downloading Image from URL");
-			metaData.coverLocation = await downloadURL(metaData.coverLocation);
-		}
+		console.log(`Downloading Image from [${metaData.coverLocation}]`);
+		metaData.coverLocation = await downloadURL(metaData.coverLocation);
 	} catch(err) {
 		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
-		console.warn(`Failed to Download Image\nDefaulting to ${metaData.coverLocation}`);
+		console.warn(`Failed to Download Image\nDefaulting to Image Stored at [${metaData.coverLocation}]`);
 	}
 
 	return metaData;
@@ -112,9 +125,11 @@ async function metaDataPrompt(ytdlInfo) {
 
 async function start() {
 	let info;
-	await PS.Promptlet({
+	await PS.PromptSet()
+		.addNew({
 			name: "url",
 			message: "Paste the Youtube Video URL Here",
+			required: true,
 			validate: async val => {
 				try {
 					info = await ytdl.getInfo(val);
@@ -123,7 +138,7 @@ async function start() {
 					return "Invalid Youtube Video URL";
 				}
 			}
-		}).execute();
+		}).start();
 
 	const url = info.videoDetails.video_url;
 	console.log(`Processed Youtube URL: ${url}`);
@@ -169,6 +184,10 @@ function ytDownload(info, url) {
 			reject(err);
 		});
 
+		youtubeDownload.on("progress", (chunk, downloaded, totalSize) => {
+			console.log(`Progress: [${(downloaded / totalSize * 100).toFixed(2)}%] (${downloaded}/${totalSize})`);
+		});
+
 		youtubeDownload.on("finish", () => {
 			console.log("Youtube Download Complete");
 			resolve(ytDownloadPath);
@@ -178,21 +197,6 @@ function ytDownload(info, url) {
 		youtubeDownload
 			.pipe(fs.createWriteStream(ytDownloadPath));
 	});
-}
-
-async function downloadThumbnail(YoutubeVideoInfo) {
-	let imageURL;
-
-	if(!imageURL) {
-		const thumbnails = YoutubeVideoInfo.videoDetails.thumbnails;
-		let selectedThumbnail = thumbnails[0];
-		for(const thumbnail of thumbnails) {
-			selectedThumbnail = thumbnail.width > selectedThumbnail.width ? thumbnail : selectedThumbnail;
-		}
-		imageURL = selectedThumbnail.url;
-	}
-
-	return downloadURL(imageURL);
 }
 
 function downloadURL(imageURL) {
@@ -207,7 +211,7 @@ function downloadURL(imageURL) {
 			res.on("error", err => {
 				console.warn("Error encountered while downloading image");
 				reject(err);
-			})
+			});
 			res.pipe(writeTo);
 		})
 	});
