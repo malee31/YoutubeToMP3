@@ -14,14 +14,16 @@ require("dotenv").config();
 PS.Configurer.inquirer.registerPrompt("autocomplete", require("inquirer-autocomplete-prompt"));
 PS.Configurer.inquirer.registerPrompt("file-tree", require("inquirer-file-tree-selection-prompt"));
 
-async function metaDataPrompt(ytdlInfo) {
+async function metaDataPrompt(suggestData) {
+	const suggest = (suggestion, suggestText = "Suggested:") => suggestion ? ` [${suggestText} ${suggestion}]` : "";
+
 	const metaData = await PS.PromptSet()
 		.setFinishMode(2)
 		.addNew([
 			{
 				name: "fileName",
 				optionName: "Edit Filename",
-				message: `What File Name Would You Like to Give the Audio File?${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.title}>` : ""}`,
+				message: "What File Name Would You Like to Give the Audio File?" + suggest(suggestData.title),
 				allowBlank: false,
 				required: true,
 				editable: true
@@ -33,9 +35,8 @@ async function metaDataPrompt(ytdlInfo) {
 				type: "autocomplete",
 				source: async(ans, text) => {
 					text = typeof text === "string" ? text : "";
-					const title = ytdlInfo.videoDetails.title;
-					const choices = [title].concat(
-						title.split(/[~@*=_|:"'(){}\[\]\\\/\-]+/g)
+					const choices = [suggestData.title].concat(
+						suggestData.title.split(/[~@*=_|:"'(){}\[\]\\\/\-]+/g)
 							.map(str => str.trim())
 							.filter(str => str.length > 0)
 							.sort()
@@ -44,30 +45,22 @@ async function metaDataPrompt(ytdlInfo) {
 				},
 				suggestOnly: true,
 				emptyText: "No Suggestions",
-				value: ytdlInfo.videoDetails.title,
-				default: ytdlInfo.videoDetails.title,
+				value: suggestData.title,
+				default: suggestData.title,
 				editable: true
 			},
 			{
 				name: "coverLocation",
 				optionName: "Edit Cover Image",
 				message: "What Would You Like as the Cover Image? (Leave Blank for Video Thumbnail or Provide an Image URL)",
-				default: ytdlInfo.videoDetails.thumbnails.reduce(
-					(previous, next) => {
-						return previous.width < next.width ? next : previous;
-					}
-				).url,
-				value: ytdlInfo.videoDetails.thumbnails.reduce(
-					(previous, next) => {
-						return previous.width < next.width ? next : previous;
-					}
-				).url,
+				default: suggestData.cover,
+				value: suggestData.cover,
 				editable: true
 			},
 			{
 				name: "creator",
 				optionName: "Edit Creator Name",
-				message: `Who is the Creator? (Leave Blank to Skip)${ytdlInfo ? ` <Suggested: ${ytdlInfo.videoDetails.ownerChannelName}>` : ""}`,
+				message: "Who is the Creator? (Leave Blank to Skip)" + suggest(suggestData.creator),
 				value: "",
 				editable: true
 			},
@@ -90,7 +83,7 @@ async function metaDataPrompt(ytdlInfo) {
 			{
 				name: "genre",
 				optionName: "Edit Genre",
-				message: "What Genre? (Leave Blank to Skip)",
+				message: "What is the Genre? (Leave Blank to Skip)",
 				value: "",
 				allowBlank: true,
 				editable: true
@@ -98,7 +91,7 @@ async function metaDataPrompt(ytdlInfo) {
 			{
 				name: "year",
 				optionName: "Edit Release Year",
-				message: `What Year was this Released? (Leave Blank to Skip) [Uploaded on ${ytdlInfo.videoDetails.uploadDate}]`,
+				message: "What Year was this Released? (Leave Blank to Skip)" + suggest(suggestData.date, "Uploaded on"),
 				validate: val => /^[12][0-9]{3}$/.test(val),
 				value: "",
 				allowBlank: true,
@@ -114,6 +107,10 @@ async function metaDataPrompt(ytdlInfo) {
 
 	try {
 		console.log(`Downloading Image from [${metaData.coverLocation}]`);
+		if(!metaData.coverLocation.startsWith("https://")) {
+			console.warn("URL must start with https!");
+			throw new Error("Bad URL");
+		}
 		metaData.coverLocation = await downloadURL(metaData.coverLocation);
 	} catch(err) {
 		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
@@ -143,7 +140,17 @@ async function start() {
 	const url = info.videoDetails.video_url;
 	console.log(`Processed Youtube URL: ${url}`);
 
-	const metaData = await metaDataPrompt(info);
+	const suggestData = {
+		title: info.videoDetails.title,
+		cover: info.videoDetails.thumbnails.reduce(
+			(previous, next) => {
+				return previous.width < next.width ? next : previous;
+			}
+		).url,
+		creator: info.videoDetails.ownerChannelName,
+		date: info.videoDetails.uploadDate
+	};
+	const metaData = await metaDataPrompt(suggestData);
 
 	console.log("========== Download Started ==========");
 	let downloadedPath = await ytDownload(info, url);
@@ -158,12 +165,18 @@ async function metaDataEdit() {
 			name: "filePath",
 			optionName: "File Path",
 			message: "Paste the Absolute Path of the MP3 to Edit Here",
-			allowBlank: false
+			allowBlank: false,
+			required: true
 		}).start();
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
-	console.warn(`Editing file at ${filePath}`)
-	const metaData = await metaDataPrompt();
+	console.warn(`Editing file at ${filePath}`);
+	const suggestionData = {
+		title: path.basename(filePath).replace(".mp3", ""),
+		creator: "",
+		cover: path.resolve(__dirname, "resources", "default.png")
+	};
+	const metaData = await metaDataPrompt(suggestionData);
 
 	console.log("========== Converting to MP3 =========");
 	filePath = await convertToMp3(filePath, metaData);
