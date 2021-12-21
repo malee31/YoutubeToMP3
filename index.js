@@ -18,7 +18,6 @@ async function metaDataPrompt(suggestData) {
 	const suggest = (suggestion, suggestText = "Suggested:") => suggestion ? ` [${suggestText} ${suggestion}]` : "";
 
 	const metaData = await PS.PromptSet()
-		.setFinishMode(2)
 		.addNew([
 			{
 				name: "fileName",
@@ -123,6 +122,7 @@ async function metaDataPrompt(suggestData) {
 async function start() {
 	let info;
 	await PS.PromptSet()
+		.setFinishMode(3)
 		.addNew({
 			name: "url",
 			message: "Paste the Youtube Video URL Here",
@@ -161,6 +161,7 @@ async function start() {
 
 async function metaDataEdit() {
 	let { filePath } = await PS.PromptSet()
+		.setFinishMode(3)
 		.addNew({
 			name: "filePath",
 			optionName: "File Path",
