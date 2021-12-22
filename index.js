@@ -9,6 +9,7 @@ const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
 const PS = require("prompt-set");
 const fuzzy = require("fuzzy");
+const ProgressBar = require("progress");
 require("dotenv").config();
 
 PS.Configurer.inquirer.registerPrompt("autocomplete", require("inquirer-autocomplete-prompt"));
@@ -198,8 +199,15 @@ function ytDownload(info, url) {
 			reject(err);
 		});
 
+		let progressBar;
+		youtubeDownload.on("info", (info, format) => {
+			progressBar = new ProgressBar(" :percent [:bar] (:current/:total bytes)", {
+				total: Number(format.contentLength)
+			});
+		});
+
 		youtubeDownload.on("progress", (chunk, downloaded, totalSize) => {
-			console.log(`Progress: [${(downloaded / totalSize * 100).toFixed(2)}%] (${downloaded}/${totalSize})`);
+			progressBar.tick(chunk);
 		});
 
 		youtubeDownload.on("finish", () => {
