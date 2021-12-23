@@ -113,7 +113,7 @@ async function metaDataPrompt(suggestData) {
 		}
 		metaData.coverLocation = await downloadURL(metaData.coverLocation);
 	} catch(err) {
-		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "default.png");
+		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "resources", "default.png");
 		console.warn(`Failed to Download Image\nDefaulting to Image Stored at [${metaData.coverLocation}]`);
 	}
 
@@ -244,12 +244,19 @@ function convertToMp3(filePath, metaData) {
 	const ffmpegProcess = ffmpeg(filePath);
 
 	return new Promise((resolve, reject) => {
+		let progressBar = new ProgressBar(" :percent [:bar]", {
+			total: 100
+		});
+
 		ffmpegProcess
 			.addOutputOptions('-i', path.resolve(__dirname, metaData.coverLocation))
 			.format("mp3")
 			.on("error", err => {
 				console.log("Something went wrong while converting to MP3");
 				reject(err);
+			})
+			.on("progress", progressData => {
+				progressBar.update(Math.ceil(progressData.percent) / 100);
 			})
 			.on("end", () => {
 				console.log('========== Converted ==========');
