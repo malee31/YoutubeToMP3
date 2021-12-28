@@ -139,7 +139,7 @@ async function start() {
 		}).start();
 
 	const url = info.videoDetails.video_url;
-	console.log(`Processed Youtube URL: ${url}`);
+	console.log(`Processed Youtube URL: ${url}\nFill in additional details below`);
 
 	const suggestData = {
 		title: info.videoDetails.title,
@@ -166,9 +166,27 @@ async function metaDataEdit() {
 		.addNew({
 			name: "filePath",
 			optionName: "File Path",
-			message: "Paste the Absolute Path of the MP3 to Edit Here",
+			message: "Paste the Path of the MP3 to Edit Here. Relative to placeholder or absolute paths are allowed",
 			allowBlank: false,
-			required: true
+			required: true,
+			transformer: val => path.resolve(__dirname, val),
+			filter: val => path.resolve(__dirname, val),
+			validate: async val => {
+				return fs.promises.stat(val)
+					.then(stat => {
+						console.log(`Path is valid: ${stat.path}`);
+						if(!stat.isFile()) {
+							return "Not a file!";
+						}
+						return true;
+					}).catch(err => {
+						if(err.code === 'ENOENT') {
+							return `File does not exist at ${val}`;
+						} else {
+							return `Unable to open file: ${err.code}`;
+						}
+					});
+			}
 		}).start();
 
 	console.warn("Note: If you are editing an MP3 file, you cannot give it the same file name if it will be saved to the same folder again or the data will be lost.");
