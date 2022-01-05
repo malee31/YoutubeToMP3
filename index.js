@@ -18,7 +18,7 @@ PS.Configurer.inquirer.registerPrompt("file-tree", require("inquirer-file-tree-s
 async function metaDataPrompt(suggestData) {
 	const suggest = (suggestion, suggestText = "Suggested:") => suggestion ? ` [${suggestText} ${suggestion}]` : "";
 
-	const metaData = await PS.PromptSet()
+	const Set = PS.PromptSet()
 		.addNew([
 			{
 				name: "fileName",
@@ -39,6 +39,7 @@ async function metaDataPrompt(suggestData) {
 						suggestData.title.split(/[~@*=_|:"'(){}\[\]\\\/\-]+/g)
 							.map(str => str.trim())
 							.filter(str => str.length > 0)
+							.filter((str, index, arr) => index === arr.indexOf(str))
 							.sort()
 					);
 					return fuzzy.filter(text, choices).map(text => text.string);
@@ -97,8 +98,10 @@ async function metaDataPrompt(suggestData) {
 				allowBlank: true,
 				editable: true
 			}
-		])
-		.start();
+		]);
+	Set.autoclear = false;
+
+	const metaData = await Set.start();
 
 	if(!metaData.fileName.endsWith(".mp3")) metaData.fileName += ".mp3";
 	console.log(`Audio will be saved in ${metaData.fileName}`);

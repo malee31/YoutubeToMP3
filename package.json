@@ -17,7 +17,7 @@
 		"inquirer-autocomplete-prompt": "^1.4.0",
 		"inquirer-file-tree-selection-prompt": "^1.0.12",
 		"progress": "^2.0.3",
-		"prompt-set": "^2.1.1",
+		"prompt-set": "^4.0.0",
 		"ytdl-core": "^4.9.2"
 	},
 	"repository": {
