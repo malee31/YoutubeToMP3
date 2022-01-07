@@ -108,16 +108,13 @@ async function metaDataPrompt(suggestData) {
 	if(!metaData.title) metaData.title = metaData.fileName.slice(0, metaData.fileName.length - 4);
 	console.log(`Title will be set as ${metaData.title}`);
 
-	try {
-		console.log(`Downloading Image from [${metaData.coverLocation}]`);
-		if(!metaData.coverLocation.startsWith("https://")) {
-			console.warn("URL must start with https!");
-			throw new Error("Bad URL");
-		}
-		metaData.coverLocation = await downloadURL(metaData.coverLocation);
-	} catch(err) {
+	console.log(`Downloading Image from [${metaData.coverLocation}]`);
+	if(!metaData.coverLocation.startsWith("https://")) {
+		console.warn("URL must start with https!");
 		metaData.coverLocation = process.env.DEFAULT_IMAGE_PATH || path.resolve(__dirname, "resources", "default.png");
 		console.warn(`Failed to Download Image\nDefaulting to Image Stored at [${metaData.coverLocation}]`);
+	} else {
+		metaData.coverLocation = await downloadURL(metaData.coverLocation);
 	}
 
 	return metaData;
