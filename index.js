@@ -120,7 +120,7 @@ async function metaDataPrompt(suggestData) {
 	return metaData;
 }
 
-async function start() {
+async function fetchSuggestDataFromYoutube() {
 	let info;
 	await PS.PromptSet()
 		.setFinishMode(3)
@@ -141,20 +141,24 @@ async function start() {
 	const url = info.videoDetails.video_url;
 	console.log(`Processed Youtube URL: ${url}\nFill in additional details below`);
 
-	const suggestData = {
+	return [info, {
 		title: info.videoDetails.title,
 		cover: info.videoDetails.thumbnails.reduce(
-			(previous, next) => {
-				return previous.width < next.width ? next : previous;
-			}
+			// Get the largest/highest quality thumbnail
+			(previous, next) => previous.width < next.width ? next : previous
 		).url,
 		creator: info.videoDetails.ownerChannelName,
 		date: info.videoDetails.uploadDate
-	};
+	}];
+}
+
+async function start() {
+	const [info, suggestData] = await fetchSuggestDataFromYoutube();
 	const metaData = await metaDataPrompt(suggestData);
 
 	console.log("========== Download Started ==========");
-	let downloadedPath = await ytDownload(info, url);
+	let downloadedPath = await ytDownload(info);
+
 	console.log("========== Converting to MP3 =========");
 	downloadedPath = await convertToMp3(downloadedPath, metaData);
 	console.log(`Final Result Saved To: ${downloadedPath}`);
@@ -203,13 +207,13 @@ async function metaDataEdit() {
 	console.log(`Final Result Saved To: ${filePath}`);
 }
 
-function ytDownload(info, url) {
+function ytDownload(info) {
 	let format = ytdl.chooseFormat(info.formats, {
 		quality: "highestaudio",
 		filter: "audioonly"
 	});
 	const ytDownloadPath = path.resolve(__dirname, `downloads/temp.${format.container}`);
-	let youtubeDownload = ytdl(url, { format: format });
+	let youtubeDownload = ytdl(info.videoDetails.video_url, { format: format });
 
 	return new Promise((resolve, reject) => {
 		youtubeDownload.on("error", err => {
